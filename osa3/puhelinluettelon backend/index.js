@@ -1,7 +1,10 @@
+require('dotenv').config();
 const express = require('express');
 var morgan = require('morgan');
 const app = express();
 const port = 3000;
+const apiRouter = require('./apiRouter');
+const Entry = require('./models/entry');
 
 app.use(express.json());
 
@@ -22,153 +25,33 @@ app.use(
 
 app.use(express.static('front/dist'));
 
-const apiRouter = express.Router();
-
-// NOTE: Fly.io runs the app using on two machines, so storing data like this
-//  results in bugs where there's two versions of this array
-let persons = [
-    {
-        id: 1,
-        number: '+3581234567',
-        name: 'Arto Hellas',
-    },
-    {
-        id: 2,
-        number: '+3581234567',
-        name: 'Ada Lovelace',
-    },
-    {
-        id: 3,
-        number: '+3581234567',
-        name: 'Abra Abramov',
-    },
-    {
-        id: 4,
-        number: '+3581234567',
-        name: 'Mary Poppendieck',
-    },
-];
-
-apiRouter.get('/persons', (req, res) => {
-    res.json(persons);
-});
-
-apiRouter.get('/persons/:id', (req, res) => {
-    const id = parseInt(req.params.id);
-    if (!id) {
-        res.status(400);
-        res.send("Parameter 'id' missing or not an integer");
-        return;
+const errorHandler = (err, req, res, next) => {
+    console.error(err.message);
+    if (err.name === 'CastError') {
+        return res.status(400).send({ error: 'malformatted id' });
+    } else if (err.name === 'ValidationError') {
+        return res.status(400).json({ error: err.message });
     }
 
-    const matches = persons.filter((item) => item.id === id);
-    if (matches.length === 0) {
-        res.status(404);
-        res.send('Not found');
-        return;
-    }
+    return res.status(500).send();
+};
 
-    res.json(matches[0]);
-});
-
-apiRouter.delete('/persons/:id', (req, res) => {
-    const id = parseInt(req.params.id);
-    if (!id) {
-        res.status(400);
-        res.send("Parameter 'id' missing or not an integer");
-        return;
-    }
-
-    let deleted = null;
-
-    persons = persons.filter((item) => {
-        if (item.id === id) {
-            deleted = item;
-            return false;
-        }
-        return true;
-    });
-
-    if (!deleted) res.status(404).send();
-    else res.json(deleted);
-});
-
-apiRouter.put('/persons/:id', (req, res) => {
-    const postedData = req.body;
-    if (
-        !postedData.name ||
-        postedData.name.length === 0 ||
-        !postedData.number ||
-        postedData.number.length === 0
-    ) {
-        res.status(400).json({
-            error: "Fields 'name' and 'number' are required.",
-        });
-        return;
-    }
-
-    const id = parseInt(req.params.id);
-    if (!id) {
-        res.status(400);
-        res.send("Parameter 'id' missing or not an integer");
-        return;
-    }
-
-    let updated = null;
-
-    for (let i = 0; i < persons.length; i++) {
-        if (persons[i].id === id) {
-            persons[i].name = postedData.name;
-            persons[i].number = postedData.number;
-            updated = persons[i];
-            break;
-        }
-    }
-
-    if (!updated) res.status(404).send();
-    else res.json(updated);
-});
-
-apiRouter.post('/persons', (req, res) => {
-    const postedData = req.body;
-
-    if (
-        !postedData.name ||
-        postedData.name.length === 0 ||
-        !postedData.number ||
-        postedData.number.length === 0
-    ) {
-        res.status(400).json({
-            error: "Fields 'name' and 'number' are required.",
-        });
-        return;
-    }
-
-    for (let person of persons) {
-        if (person.name === postedData.name) {
-            res.status(409).json({
-                error: "Field 'name' must be unique; a record already exists by that name.",
-            });
-            return;
-        }
-    }
-    const newPerson = {
-        id: Math.floor(Math.random() * 1000000000),
-        name: postedData.name,
-        number: postedData.number,
-    };
-    persons.push(newPerson);
-    res.status(201).json(newPerson);
-});
-
+apiRouter.use(errorHandler);
 app.use('/api', apiRouter);
 
-app.get('/info', (req, res) => {
-    res.send(
-        `<p>Phonebook has info for ${persons.length} people</p>
+app.get('/info', (_req, res, next) => {
+    Entry.countDocuments({})
+        .then((count) => {
+            res.send(
+                `<p>Phonebook has info for ${count} people</p>
          <p>${new Date().toString()}</p>`,
-    );
+            );
+        })
+
+        .catch((err) => next(err));
 });
+
+app.use(errorHandler);
 
 app.listen(port, '0.0.0.0', () => {
     console.log(`Example app listening on port ${port}`);

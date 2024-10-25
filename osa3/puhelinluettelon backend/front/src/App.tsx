@@ -8,6 +8,7 @@ import {
     remove as removePerson,
 } from './services/persons';
 import Notificaton, { NotificationState } from './Notification';
+import { AxiosError } from 'axios';
 
 export interface Person {
     id?: number;
@@ -44,6 +45,22 @@ function App() {
             );
     }
 
+    function errorHandler(err: AxiosError) {
+        if (!err.response) return;
+        if (err.status !== 400) {
+            console.error(err);
+            return;
+        }
+
+        notify(
+            {
+                message: (err.response.data as any).error,
+                kind: 'error',
+            },
+            0,
+        );
+    }
+
     return (
         <div>
             <Notificaton state={notifState} />
@@ -51,18 +68,20 @@ function App() {
             <PersonForm
                 persons={persons}
                 onNewPerson={(person) => {
-                    createPerson(person).then((createdPerson: Person) => {
-                        setPersons((old) => {
-                            const copy = [...old];
-                            copy.push(createdPerson);
-                            return copy;
-                        });
+                    createPerson(person)
+                        .then((createdPerson: Person) => {
+                            setPersons((old) => {
+                                const copy = [...old];
+                                copy.push(createdPerson);
+                                return copy;
+                            });
 
-                        notify({
-                            message: `Added ${createdPerson.name}`,
-                            kind: 'success',
-                        });
-                    });
+                            notify({
+                                message: `Added ${createdPerson.name}`,
+                                kind: 'success',
+                            });
+                        })
+                        .catch((err) => errorHandler(err));
                 }}
                 onUpdateNumber={(number, person) => {
                     updatePerson(person.id!, {
@@ -75,12 +94,7 @@ function App() {
                                 kind: 'success',
                             });
                         })
-                        .catch(() => {
-                            notify({
-                                message: `Information of ${person.name} has been removed from the server`,
-                                kind: 'error',
-                            });
-                        })
+                        .catch((err) => errorHandler(err))
                         .finally(() => setForceRefresh((old) => old + 1));
                 }}
             />
@@ -89,13 +103,16 @@ function App() {
             <Persons
                 persons={persons}
                 onPersonDelete={(id) => {
-                    removePerson(id).then((removedPerson: Person) => {
-                        setForceRefresh((old) => old + 1);
-                        notify({
-                            message: `Removed ${removedPerson.name}`,
-                            kind: 'success',
-                        });
-                    });
+                    removePerson(id)
+                        .then((removedPerson: Person) => {
+                            setForceRefresh((old) => old + 1);
+                            console.log(removedPerson);
+                            notify({
+                                message: `Removed ${removedPerson.name}`,
+                                kind: 'success',
+                            });
+                        })
+                        .catch((err) => errorHandler(err));
                 }}
             />
         </div>
