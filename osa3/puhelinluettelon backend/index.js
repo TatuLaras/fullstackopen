@@ -25,7 +25,7 @@ app.use(
 
 app.use(express.static('front/dist'));
 
-const errorHandler = (err, req, res, next) => {
+const errorHandler = (err, _req, res) => {
     console.error(err.message);
     if (err.name === 'CastError') {
         return res.status(400).send({ error: 'malformatted id' });
