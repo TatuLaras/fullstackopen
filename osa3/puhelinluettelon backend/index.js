@@ -1,7 +1,7 @@
 const express = require('express');
 var morgan = require('morgan');
 const app = express();
-const port = 3001;
+const port = 3000;
 
 app.use(express.json());
 
@@ -24,6 +24,8 @@ app.use(express.static('front/dist'));
 
 const apiRouter = express.Router();
 
+// NOTE: Fly.io runs the app using on two machines, so storing data like this
+//  results in bugs where there's two versions of this array
 let persons = [
     {
         id: 1,
@@ -168,6 +170,6 @@ app.get('/info', (req, res) => {
     );
 });
 
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
     console.log(`Example app listening on port ${port}`);
 });
